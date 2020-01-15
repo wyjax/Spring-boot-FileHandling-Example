@@ -12,7 +12,7 @@ Description: <span th:utext="${description}"></span>
 <br/>
 <h3>Uploaded Files:</h3>
 <ul th:each="file : ${uploadedFiles}">
-    <li th:utext="${file}"></li>
+    <li><a th:utext="${file}"></a><a th:href="@{'/download/' + ${file.getName()}}">download</a></li>
 </ul>
 <h3>Failed:</h3>
 <ul th:each="file : ${failedFiles}">

@@ -1,20 +1,29 @@
 package com.example.filehandle.controller;
 
 import com.example.filehandle.model.FileForm;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
 @Controller
 public class FileController {
+    private static final String dir = "C:/Users/spiritum/Desktop/uploadFolder";
+
+    @Autowired
+    private ServletContext servletContext;
 
     @GetMapping("/")
     public String home() {
@@ -53,9 +62,8 @@ public class FileController {
 
     public String doUpload(HttpServletRequest request, Model model, FileForm myUploadForm) {
         String description = myUploadForm.getDescription();
-        String folderPath = "C:/Users/spiritum/Desktop/uploadFolder";
 
-        File uploadRootDir = new File(folderPath);
+        File uploadRootDir = new File(dir);
         // Create directory if it not exists.
         if (!uploadRootDir.exists()) {
             uploadRootDir.mkdirs();
@@ -67,7 +75,7 @@ public class FileController {
 
         for (MultipartFile fileData : fileDatas) {
 
-            String name = fileData.getOriginalFilename();
+            String name = StringUtils.cleanPath(fileData.getOriginalFilename());
             System.out.println("Client File Name = " + name);
 
             if (name != null && name.length() > 0) {
@@ -89,5 +97,24 @@ public class FileController {
         model.addAttribute("failedFiles", failedFiles);
 
         return "uploadResult";
+    }
+
+    @GetMapping("/download/{filename}")
+    public ResponseEntity<InputStreamResource> download(@PathVariable("filename") String filename) throws IOException {
+        MediaType mediaType = MediaTypeUtils.getMediaTypeForFileName(servletContext, filename);
+        System.out.println("fileName: " + filename);
+        System.out.println("mediaType: " + mediaType);
+
+        File file = new File(dir + "/" + filename);
+        InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+
+        return ResponseEntity.ok()
+                // Content-Disposition
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + file.getName())
+                // Content-Type
+                .contentType(mediaType)
+                // Contet-Length
+                .contentLength(file.length()) //
+                .body(resource);
     }
 }
