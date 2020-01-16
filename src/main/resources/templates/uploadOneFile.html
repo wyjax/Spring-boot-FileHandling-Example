@@ -8,18 +8,16 @@
 
 <body>
 <th:block th:include="/_menu"></th:block>
-
 <h3>Upload One File:</h3>
 
 <!-- MyUploadForm -->
 
-<form th:object="${FileForm}" method="POST"
-      action="" enctype="multipart/form-data">
+<form method="POST" th:object="${fileForm}" action="/uploadFile" enctype="multipart/form-data">
     Description:
     <br>
-    <input th:field="*{description}" style="width:300px;"/>
+    <input style="width:300px;"/>
     <br/><br/>
-    File to upload: <input th:field="*{fileDatas}" type="file"/>
+    File to upload: <input th:field="${fileForm.fileDatas}" type="file"/>
     <br/>
     <input type="submit" value="Upload">
 </form>
