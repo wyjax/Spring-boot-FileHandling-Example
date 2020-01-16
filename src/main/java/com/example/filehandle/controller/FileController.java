@@ -1,120 +1,99 @@
 package com.example.filehandle.controller;
 
 import com.example.filehandle.model.FileForm;
+import com.example.filehandle.service.FileStorageService;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
 
 @Controller
+@RequiredArgsConstructor
 public class FileController {
-    private static final String dir = "C:/Users/spiritum/Desktop/uploadFolder";
+
+    private static final Logger logger = LoggerFactory.getLogger(FileController.class);
 
     @Autowired
-    private ServletContext servletContext;
+    private FileStorageService fileStorageService;
 
     @GetMapping("/")
-    public String home() {
+    public String home(Model model) {
         return "index";
     }
 
     @GetMapping("/uploadOneFile")
     public String uploadOneFile(Model model) {
-        model.addAttribute("FileForm", new FileForm());
+        model.addAttribute("fileForm", new FileForm());
         return "uploadOneFile";
     }
 
-    @PostMapping("/uploadOneFile")
-    public String uploadOneFileHandlerPOST(HttpServletRequest request, //
-                                           Model model, //
-                                           @ModelAttribute("myUploadForm") FileForm myUploadForm) {
+    @PostMapping("/uploadFile")
+    public String uploadFile(FileForm form) {
+        MultipartFile[] files = form.getFileDatas();
 
-        return doUpload(request, model, myUploadForm);
+        for (MultipartFile file : files) {
+            if (file.getOriginalFilename() == null || file.getSize() == 0) continue;
+            String filename = fileStorageService.storeFile(file);
+        }
+        return "redirect:/";
     }
 
     @GetMapping("/uploadMultiFile")
     public String uploadMultiFileHandler(Model model) {
-
-        FileForm myUploadForm = new FileForm();
-        model.addAttribute("FileForm", myUploadForm);
-
+        model.addAttribute("FileForm", new FileForm());
         return "uploadMultiFile";
     }
 
-    @PostMapping("/uploadMultiFile")
-    public String uploadMultiFileHandlerPOST(HttpServletRequest request, Model model,
-                                             @ModelAttribute("FileForm") FileForm myUploadForm) {
+//    @PostMapping("/uploadMultiFile")
+//    public String uploadMultipleFiles(FileForm form) {
+//        MultipartFile[] files = form.getFileDatas();
+//
+//        for (MultipartFile file : files) {
+//            if (file.getOriginalFilename() == null || file.getSize() == 0) continue;
+//            String filename = fileStorageService.storeFile(file);
+//        }
+//        return "redirect:/";
+//    }
 
-        return doUpload(request, model, myUploadForm);
-    }
+    @GetMapping("/downloadFile/{fileName:.+}")
+    public ResponseEntity<Resource> downloadFile(@PathVariable String fileName, HttpServletRequest request) {
+        Resource resource = fileStorageService.loadFile(fileName);
 
-    public String doUpload(HttpServletRequest request, Model model, FileForm myUploadForm) {
-        String description = myUploadForm.getDescription();
-
-        File uploadRootDir = new File(dir);
-        // Create directory if it not exists.
-        if (!uploadRootDir.exists()) {
-            uploadRootDir.mkdirs();
+        String contentType = null;
+        try {
+            contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
         }
-        MultipartFile[] fileDatas = myUploadForm.getFileDatas();
-
-        List<File> uploadedFiles = new ArrayList<>();
-        List<String> failedFiles = new ArrayList<>();
-
-        for (MultipartFile fileData : fileDatas) {
-
-            String name = StringUtils.cleanPath(fileData.getOriginalFilename());
-            System.out.println("Client File Name = " + name);
-
-            if (name != null && name.length() > 0) {
-                try {
-                    // Create the file at server
-                    File serverFile = new File(uploadRootDir.getAbsolutePath() + File.separator + name);
-                    BufferedOutputStream stream = new BufferedOutputStream(new FileOutputStream(serverFile));
-                    stream.write(fileData.getBytes());
-                    stream.close();
-                    uploadedFiles.add(serverFile);
-                }
-                catch (Exception e) {
-                    failedFiles.add(name);
-                }
-            }
+        catch (IOException ex) {
+            logger.info("Could not determine file type.");
         }
-        model.addAttribute("description", description);
-        model.addAttribute("uploadedFiles", uploadedFiles);
-        model.addAttribute("failedFiles", failedFiles);
 
-        return "uploadResult";
-    }
-
-    @GetMapping("/download/{filename}")
-    public ResponseEntity<InputStreamResource> download(@PathVariable("filename") String filename) throws IOException {
-        MediaType mediaType = MediaTypeUtils.getMediaTypeForFileName(servletContext, filename);
-        System.out.println("fileName: " + filename);
-        System.out.println("mediaType: " + mediaType);
-
-        File file = new File(dir + "/" + filename);
-        InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
 
         return ResponseEntity.ok()
-                // Content-Disposition
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + file.getName())
-                // Content-Type
-                .contentType(mediaType)
-                // Contet-Length
-                .contentLength(file.length()) //
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
                 .body(resource);
+    }
+
+    @GetMapping("fileList")
+    public String fileList(Model model) {
+//        Resource resource = fileStorageService.lo
+
+        return "ListForm";
     }
 }
